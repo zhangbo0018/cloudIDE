@@ -1,0 +1,5 @@
+neo4j-community-5.21.2-unix.tar.gz*
+.ssh/
+combined_data_1.txt*
+.vscode/
+*.csv
