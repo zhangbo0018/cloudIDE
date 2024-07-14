@@ -4,52 +4,58 @@ import pandas as pd
 uri = "neo4j://43.138.245.52:7687"
 driver = GraphDatabase.driver(uri, auth=("neo4j", "qwer1234"))
 
-k = 10 # nearest neighbors (most similar users) to consider
-movies_common = 3 # how many movies in common to be consider an user similar
-users_common = 2 # minimum number of similar users that have seen the movie to consider it
-threshold_sim = 0.9 # threshold to consider users similar
+k = 10 # 考虑的最近邻居（最相似的用户）数量
+movies_common = 3 # 被认为用户相似的共同电影数量
+users_common = 2 # 考虑一部电影所需的相似用户的最小数量
+threshold_sim = 0.9 # 认为用户相似的阈值
 
 def load_data():
+    """
+    加载数据并创建知识图谱
+
+    此函数将重置Neo4j数据库，删除所有现有关系和节点，然后加载电影、评分、类型、关键字和制作人数据，以构建知识图谱。
+    """
     with driver.session() as session:
+        # 重置图
         session.run("""MATCH ()-[r]->() DELETE r""")
         session.run("""MATCH (r) DELETE r""")
-        
-        print("Loading movies...")
-        #加载数据，创建Movie标签,title属性的实体
+
+        print("加载电影中...")
+        # 加载电影数据，创建电影节点
         session.run("""
             LOAD CSV WITH HEADERS FROM "file:///out_movies.csv" AS csv
             CREATE (:Movie {title: csv.title})
             """)
-            
-        print("Loading gradings...")
-        #加载评分数据，    MERGE是搜索给定模式，如果存在，则返回结果如果它不存在于图中，则它创建新的节点/关系并返回结果。
+
+        print("加载评分中...")
+        # 加载评分数据，创建用户节点和RATED关系
         session.run("""
             LOAD CSV WITH HEADERS FROM "file:///out_grade.csv" AS csv
             MERGE (m:Movie {title: csv.title}) 
             MERGE (u:User {id: toInteger(csv.user_id)})
             CREATE (u)-[:RATED {grading : toInteger(csv.grade)}]->(m)
             """)
-        #加载影片类型数据    
-        print("Loading genres...")
-            
+
+        print("加载类型中...")
+        # 加载电影类型数据，创建HAS_GENRE关系
         session.run("""
             LOAD CSV WITH HEADERS FROM "file:///out_genre.csv" AS csv
             MERGE (m:Movie {title: csv.title})
             MERGE (g:Genre {genre: csv.genre})
             CREATE (m)-[:HAS_GENRE]->(g)
             """)
-            
-        print("Loading keywords...")
-        #加载关键词数据    
+
+        print("加载关键字中...")
+        # 加载关键字数据，创建HAS_KEYWORD关系
         session.run("""
             LOAD CSV WITH HEADERS FROM "file:///out_keyword.csv" AS csv
             MERGE (m:Movie {title: csv.title})
             MERGE (k:Keyword {keyword: csv.keyword})
             CREATE (m)-[:HAS_KEYWORD]->(k)
             """)
-            
-        print("Loading productors...")
-        #制片人    
+
+        print("加载制作人中...")
+        # 加载制作人数据，创建HAS_PRODUCTOR关系
         session.run("""
             LOAD CSV WITH HEADERS FROM "file:///out_productor.csv" AS csv
             MERGE (m:Movie {title: csv.title})
@@ -58,12 +64,17 @@ def load_data():
             """)
 
 def queries():
+    """
+    执行查询，为特定用户推荐电影
+
+    这个函数会根据用户的喜好，为其推荐电影。它首先会询问用户是否需要过滤掉不喜欢的类型，然后计算用户与其他用户的相似度，找到与用户喜好相似的用户。接着，它会根据这些相似用户的评分，为用户推荐评分较高的电影。
+    """
     while True:
-        userid = int(input("请输入要为哪位用户推荐电影，输入其ID即可: "))
-        m = int(input("为该用户推荐多少个电影呢？ "))
-        
+        userid = int(input("请输入要为哪位用户推荐电影，输入其ID即可："))
+        m = int(input("为该用户推荐多少个电影呢？"))
+
         genres = []
-        if int(input("是否需要过滤掉不喜欢的类型?（输入0或1）")):#过滤掉不喜欢的类型
+        if int(input("是否需要过滤掉不喜欢的类型？（输入0或1）")):#过滤掉不喜欢的类型
             with driver.session() as session:
                 try:
                     q = session.run(f"""MATCH (g:Genre) RETURN g.genre AS genre""")
@@ -74,7 +85,7 @@ def queries():
                     print()
                     print(df)
                     inp = input("输入不喜欢的类型索引即可，例如：1 2 3  ")
-                    if len(inp) != 0:
+                    if len(inp)!= 0:
                         inp = inp.split(" ")
                         genres = [df["genre"].iloc[int(x)] for x in inp]
                 except:
@@ -88,7 +99,7 @@ def queries():
                     """)
             
             print()
-            print("Your ratings are the following:")
+            print("你的评分如下：")
             
             result = []
             for r in q:
@@ -143,19 +154,20 @@ def queries():
                     LIMIT {m}
                     """)
 
-            print("Recommended movies:")
+            print("推荐的电影：")
 
             result = []
             for r in q:
                 result.append([r["title"], r["grade"], r["num"], r["gen"]])
             if len(result) == 0:
-                print("No recommendations found")
+                print("没有找到推荐")
                 print()
                 continue
             df = pd.DataFrame(result, columns=["title", "avg grade", "num recommenders", "genres"])
             print()
             print(df.to_string(index=False))
             print()
+
 
 if __name__ == "__main__":
     if int(input("是否需要重新加载并创建知识图谱？（请选择输入0或1）")):
