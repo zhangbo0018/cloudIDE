@@ -3,3 +3,4 @@ neo4j-community-5.21.2-unix.tar.gz*
 combined_data_1.txt*
 .vscode/
 *.csv
+**/__pycache__/
