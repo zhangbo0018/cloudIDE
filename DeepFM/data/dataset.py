@@ -29,22 +29,28 @@ class CriteoDataset(Dataset):
         # 如果是训练模式，加载训练数据文件并初始化实例变量
         if self.train:
             # 读取 CSV 文件
-            data = pd.read_csv(os.path.join(root, 'train.txt'))
+            data = pd.read_csv(os.path.join(root, 'train.txt'), header=None)
             # 获取特征数据，去除最后一列目标值
             self.train_data = data.iloc[:, :-1].values
             # 获取目标值
             self.target = data.iloc[:, -1].values
         else:
             # 如果是测试模式，加载测试数据文件并初始化实例变量
-            data = pd.read_csv(os.path.join(root, 'test.txt'))
+            data = pd.read_csv(os.path.join(root, 'test.txt'), header=None)
             # 获取测试数据
             self.test_data = data.iloc[:, :-1].values
     
     # 根据索引获取样本数据，返回 Xi、Xv 和 target
+    """
+    Xi：特征索引
+    Xv：特征值
+    target：目标值
+    """
     def __getitem__(self, idx):
         if self.train:
             # 获取训练数据中的样本索引为 idx 的数据
             dataI, targetI = self.train_data[idx, :], self.target[idx]
+            # print(dataI)
             # 创建一个与训练数据大小相同的全零 NumPy 数组，用于表示连续特征的索引
             Xi_coutinous = np.zeros_like(dataI[:continous_features])
             # 获取训练数据中的类别特征数据，索引从 continous_features 开始

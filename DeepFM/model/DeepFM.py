@@ -53,18 +53,31 @@ class DeepFM(nn.Module):
         # 判断是否使用 CUDA，如果可以使用且 use_cuda 为 True，则将模型放在 GPU 上
         if use_cuda and torch.cuda.is_available():
             self.device = torch.device('cuda')
+            print('Using GPU')
         # 否则将模型放在 CPU 上
         else:
             self.device = torch.device('cpu')
+            print('Using CPU')
         """
             初始化 FM 部分
         """
         # 初始化 FM 部分的一阶嵌入层
         self.fm_first_order_embeddings = nn.ModuleList(
             [nn.Embedding(feature_size, 1) for feature_size in self.feature_sizes])
+        # print('fm_first_order_embeddings:', self.fm_first_order_embeddings)
+        total_params = 0
+        for embedding_layer in self.fm_first_order_embeddings:
+            total_params += sum(p.numel() for p in embedding_layer.parameters())
+        print("fm_first_order_embeddings层的权重参数数量：", total_params)
+
         # 初始化 FM 部分的二阶嵌入层
         self.fm_second_order_embeddings = nn.ModuleList(
             [nn.Embedding(feature_size, self.embedding_size) for feature_size in self.feature_sizes])
+        # print('fm_second_order_embeddings:', self.fm_second_order_embeddings)
+        total_params = 0
+        for embedding_layer in self.fm_second_order_embeddings:
+            total_params += sum(p.numel() for p in embedding_layer.parameters())
+        print("fm_second_order_embeddings层的权重参数数量：", total_params)
         """
             初始化 Deep 部分
         """
@@ -74,16 +87,21 @@ class DeepFM(nn.Module):
         # 使用序列操作初始化线性层，批量归一化和 dropout 层
         for i in range(1, len(hidden_dims) + 1):
             # 初始化线性层
-            setattr(self, 'linear_' + str(i),
-                    nn.Linear(all_dims[i - 1], all_dims[i]))
+            setattr(self, 'linear_' + str(i),nn.Linear(all_dims[i - 1], all_dims[i]))
             # 使用 kaiming_normal_方法初始化 fc1 的权重
             # nn.init.kaiming_normal_(self.fc1.weight)
             # 初始化批量归一化层
-            setattr(self, 'batchNorm_' + str(i),
-                    nn.BatchNorm1d(all_dims[i]))
+            setattr(self, 'batchNorm_' + str(i),nn.BatchNorm1d(all_dims[i]))
             # 初始化 dropout 层
-            setattr(self, 'dropout_' + str(i),
-                    nn.Dropout(dropout[i - 1]))
+            setattr(self, 'dropout_' + str(i),nn.Dropout(dropout[i - 1]))
+            #  # 打印当前循环次数
+            # print("第", i, "次循环：")
+            # # 打印创建的线性层对象
+            # print("创建的线性层对象:", getattr(self, 'linear_' + str(i)))
+            # # 打印创建的批量归一化层对象
+            # print("创建的批量归一化层对象:", getattr(self, 'batchNorm_' + str(i)))
+            # # 打印创建的 dropout 层对象
+            # print("创建的 dropout 层对象:", getattr(self, 'dropout_' + str(i)))
     # 定义前向传播函数
     def forward(self, Xi, Xv):
         """
@@ -95,6 +113,16 @@ class DeepFM(nn.Module):
         """
             FM 部分
         """
+        # # 遍历 self.fm_first_order_embeddings 列表
+        # for i,emb in enumerate(self.fm_first_order_embeddings):
+        #     # 打印 Xi 矩阵的第 i 列的形状
+        #     print(Xi[:,i,:].shape)
+        #     # 打印嵌入层 emb 对 Xi 矩阵的第 i 列的操作结果的形状
+        #     print(emb(Xi[:,i,:]).shape)
+        #     # 打印 Xv 矩阵的第 i 列的形状
+        #     print(Xv[:,i].shape)
+        #     # 打印 Xv 矩阵的第 i 列的转置的形状
+        #     print(Xv[:,i].t().shape)
         # 计算 FM 部分的一阶嵌入结果
         fm_first_order_emb_arr = [(torch.sum(emb(Xi[:, i, :]), 1).t() * Xv[:, i]).t() for i, emb in
                                   enumerate(self.fm_first_order_embeddings)]
@@ -172,7 +200,7 @@ class DeepFM(nn.Module):
                 total = model(xi, xv)
                 # 使用损失函数计算输出与真实值之间的损失
                 loss = criterion(total, y)
-                #
+                # 将优化器中的梯度置为零，以便进行下一次反向传播
                 optimizer.zero_grad()
                 # 执行反向传播，计算损失相对于模型参数的梯度
                 loss.backward()
